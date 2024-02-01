@@ -1,10 +1,11 @@
 {
-    "domain": "honeygain_scrapper",
-    "name": "HoneyGain Scrapper",
-    "codeowners": ["@Makhuta"],
-    "dependencies": [],
-    "documentation": "https://github.com/Makhuta/homeassistant-honeygainscrapper",
-    "iot_class": "local_polling",
-    "requirements": ["pyHoneyGain>=0.3.5"],
-    "version": "0.1.0"
-  }
+  "codeowners": ["@Makhuta"],
+  "config_flow": false,
+  "dependencies": [],
+  "documentation": "https://github.com/Makhuta/homeassistant-honeygain_scrapper",
+  "domain": "honeygain_scrapper",
+  "iot_class": "cloud_push",
+  "name": "HoneyGain Scrapper",
+  "requirements": [],
+  "version": "0.2.0"
+}

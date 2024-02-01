@@ -1,268 +1,489 @@
-from __future__ import annotations
-
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorStateClass,
-)
-from homeassistant.const import CURRENCY_DOLLAR
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-from homeassistant.helpers.entity import generate_entity_id
-from datetime import timedelta
-from pyHoneygain import HoneyGain
-import json
-import homeassistant.helpers.config_validation as cv
-from homeassistant.components.sensor import PLATFORM_SCHEMA
-import voluptuous as vol
+from typing import Any, Callable, Dict, Optional
 import logging
+from datetime import timedelta
+import re
+import unicodedata
 
-CONF_USERNAME = 'username'
-CONF_PASSWORD = 'password'
+from homeassistant.helpers.typing import (
+    ConfigType,
+    DiscoveryInfoType,
+    HomeAssistantType,
+)
 
-SCAN_INTERVAL = timedelta(minutes=10)
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.const import CONF_URL, CONF_NAME, CONF_ID
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
-    vol.Required(CONF_USERNAME): cv.string,
-    vol.Required(CONF_PASSWORD): cv.string
-})
+from requests import get
+
+from .const import (
+    INFOS_ME,
+    INFOS_DEVICES,
+    INFOS_STATS,
+    INFOS_STATS_TODAY,
+    INFOS_STATS_TODAY_JT,
+    INFOS_NOTIFICATIONS,
+    INFOS_PAYOUTS,
+    INFOS_BALANCES
+)
 
 _LOGGER = logging.getLogger(__name__)
+SCAN_INTERVAL = timedelta(minutes=10)
 
-def setup_platform(
-    hass: HomeAssistant,
-    config: ConfigType,
-    add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None
-) -> None:
-    hg_user = HoneyGain()
+def sanitize_text(input_text):
+    lowercase_text = str(input_text).lower()
+    normalized_text = ''.join(c for c in unicodedata.normalize('NFD', lowercase_text) if unicodedata.category(c) != 'Mn')
+    sanitized_text = re.sub(r'[^a-zA-Z0-9_]', '_', normalized_text)
+
+    return sanitized_text
+
+async def get_devices(hass: HomeAssistantType, url: CONF_URL):
+    page_url = f'{url}/{INFOS_DEVICES}'
+    return await get_data(hass, page_url)
+
+async def get_stats(hass: HomeAssistantType, url: CONF_URL):
+    page_url = f'{url}/{INFOS_STATS}'
+    data = await get_data(hass, page_url)
+    stats = []
+    for key in data:
+        data[key]["date"] = key
+        stats.append(data[key])
+    return stats
+
+
+async def get_data(hass: HomeAssistantType, url: CONF_URL):
     try:
-        hg_user.login(config.get(CONF_USERNAME), config.get(CONF_PASSWORD))
-        add_entities([UserSensor(hg_user), MonthSensor(hg_user), TodaySensor(hg_user), BalanceSensor(hg_user)], True)
+        res = await hass.async_add_executor_job(get, url)
+
+        if res.status_code != 200:
+            if res.status_code == 404:
+                _LOGGER.exception(f'Unable to connect to URL: {url}')
+            else:
+                _LOGGER.exception(f'There was some unexpected error. Status code: {res.status_code}')
+        else:
+            return res.json()
     except:
-        _LOGGER.error("Error while getting logging in")
+        _LOGGER.exception("Error retrieving data from HoneyGain.")
+    return {}
 
+def filter_array(id: CONF_ID, arr):
+    for item in arr:
+        if item["id"] == id:
+            return item
 
-class UserSensor(SensorEntity):
-    def __init__(self, hg_user):
-        self._state = None
-        self._user_data = {}
-        self._hg_user = hg_user
+    return {}
 
+async def async_setup_platform(
+    hass: HomeAssistantType,
+    config: ConfigType,
+    async_add_entities: Callable,
+    discovery_info: Optional[DiscoveryInfoType] = None,
+) -> None:
+    sensors_normal = [
+        HoneyGainScrapperMeSensor(hass, config[CONF_URL]),
+        HoneyGainScrapperStatsTodaySensor(hass, config[CONF_URL]),
+        HoneyGainScrapperStatsTodayJTSensor(hass, config[CONF_URL]),
+        HoneyGainScrapperNotificationsSensor(hass, config[CONF_URL]),
+        HoneyGainScrapperBalancesSensor(hass, config[CONF_URL])
+    ]
+
+    try:
+        devices = [
+            HoneyGainScrapperDevicesSensor(
+                hass, 
+                config[CONF_URL], 
+                sanitize_text(d["title"] if d["title"] != None else d["model"]), 
+                d["id"]) 
+                for d in await get_devices(hass, config[CONF_URL]
+            )
+        ]
+    except:
+        _LOGGER.exception("Error retrieving devices from HoneyGain.")
+        devices = []
+
+    try:
+        stats = await get_stats(hass, config[CONF_URL])
+
+        statsSensors = [HoneyGainScrapperStatsSensor(hass, config[CONF_URL], s) for s in range(len(stats))]
+    except:
+        _LOGGER.exception("Error retrieving devices from HoneyGain.")
+        statsSensors = []
+
+    sensors = sensors_normal + devices + statsSensors
+    async_add_entities(sensors, update_before_add=True)
+
+class HoneyGainScrapperMeSensor(Entity):
+    """Representation of a HoneyGain sensor."""
+
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+        self.url = url
+        self._hass = hass
+        self._name = "HoneyGain Me"
+        self._state = ""
+        self._available = True
+        self.attrs: Dict[str, Any] = {}
+    
     @property
-    def name(self):
-        return 'HoneyGain User'
-
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self._name
+    
     @property
-    def unique_id(self):
-        return f"honeygain_user_stats"
-
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return f'{sanitize_text(self._name)}_{self.url}'
+    
     @property
-    def state(self):
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+    
+    @property
+    def state(self) -> Optional[str]:
         return self._state
-
-    @property
-    def extra_state_attributes(self):
-        return self._user_data
     
-    def update(self):
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        return self.attrs
+    
+    async def async_update(self):
         try:
-            myData = self._hg_user.me()
+            page_url = f'{self.url}/{INFOS_ME}'
+            data = await get_data(self._hass, page_url)
 
-            self._user_data = {
-                "id": myData["id"],
-                "email": myData["email"],
-                "email_confirmed": myData["email_confirmed"],
-                "status": myData["status"],
-                "total_devices": myData["total_devices"],
-                "referral_code": myData["referral_code"],
-                "created_at": myData["created_at"],
-                "active_devices": myData["active_devices_count"],
-                "jt_toggle": myData["jt_toggle"]
-            }
-            self._state = myData["email"]
+            self._state = data["email"]
+            self.attrs = data
+
+            self._available = True
         except:
-            _LOGGER.error("Error while getting user data")
+            self._available = False
+            _LOGGER.exception("Error retrieving data from HoneyGain.")
+
+class HoneyGainScrapperDevicesSensor(Entity):
+    """Representation of a HoneyGain sensor."""
+
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, name: CONF_NAME, id: CONF_ID):
+        self.url = url
+        self._hass = hass
+        self._name = f'HoneyGain Device {name}'
+        self._state = ""
+        self._available = True
+        self._id = id
+        self.attrs: Dict[str, Any] = {}
     
-
-class TodaySensor(SensorEntity):
-    def __init__(self, hg_user):
-        self._state = None
-        self._today_stats = {}
-        self._hg_user = hg_user
-
     @property
-    def name(self):
-        return 'HoneyGain Today'
-
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self._name
+    
     @property
-    def unique_id(self):
-        return f"honeygain_today_stats"
-
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return f'{sanitize_text(self._name)}_{self.url}'
+    
     @property
-    def state(self):
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+    
+    @property
+    def state(self) -> Optional[str]:
         return self._state
-
-    @property
-    def extra_state_attributes(self):
-        return self._today_stats
     
-    def update(self):
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        return self.attrs
+    
+    async def async_update(self):
         try:
-            statsToday = self._hg_user.stats_today()
-            self._today_stats = {
-                "gather credit": [
-                    statsToday["gathering"]["credits"]
-                ],
-                "gather bytes": [
-                    statsToday["gathering"]["bytes"]
-                ],
-                "referals": statsToday["referral"]["credits"],
-                "winnings": statsToday["winning"]["credits"],
-                "other": statsToday["other"]["credits"]
-            }
-            self._state = float(statsToday["gathering"]["credits"]) + float(statsToday["winning"]["credits"])
+            page_url = f'{self.url}/{INFOS_DEVICES}'
+            data = filter_array(self._id, await get_data(self._hass, page_url))
+
+            if "id" in data:
+                self._state = data["id"]
+            self.attrs = data
+
+            self._available = True
         except:
-            _LOGGER.error("Error while getting today data")
+            self._available = False
+            _LOGGER.exception("Error retrieving data from HoneyGain.")
 
+class HoneyGainScrapperStatsSensor(Entity):
+    """Representation of a HoneyGain sensor."""
 
-class MonthSensor(SensorEntity):
-    def __init__(self, hg_user):
-        self._state = None
-        self._month_stats = {}
-        self._hg_user = hg_user
-
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, id: CONF_ID):
+        self.url = url
+        self._hass = hass
+        self._name = f'HoneyGain stats past {30 - id}'
+        self._id = id
+        self._state = ""
+        self._available = True
+        self.attrs: Dict[str, Any] = {}
+    
     @property
-    def name(self):
-        return 'HoneyGain Month'
-
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self._name
+    
     @property
-    def unique_id(self):
-        return f"honeygain_month_stats"
-
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return f'{sanitize_text(self._name)}_{self.url}'
+    
     @property
-    def state(self):
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+    
+    @property
+    def state(self) -> Optional[str]:
         return self._state
-
-    @property
-    def extra_state_attributes(self):
-        return self._month_stats
     
-    def update(self):
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        return self.attrs
+    
+    async def async_update(self):
         try:
-            statsMonth = self._hg_user.stats()
-            credits_total = 0.0
-            gather_top_credit = []
-            gather_top_traffic = []
-            content_top = []
-            referrals_top = []
-            winnings_top = []
-            other_top = []
-            first = True
+            data = await get_stats(self._hass, self.url)
 
-            for key, value in statsMonth.items():
-                credits_total += float(value["gathering"]["credits"]) 
-                credits_total += float(value["content_delivery"]["credits"]) 
-                credits_total += float(value["referrals"]["credits"]) 
-                credits_total += float(value["winnings"]["credits"]) 
-                credits_total += float(value["other"]["credits"])
+            if len(data) > self._id:
+                if "date" in data[self._id]:
+                    self._state = data[self._id]["date"]
+                self.attrs = data[self._id]
 
-                day = {
-                    "gather": value["gathering"],
-                    "content": value["content_delivery"],
-                    "referrals": value["referrals"],
-                    "winnings": {
-                        "credits": value["winnings"]["credits"]
-                    },
-                    "other": {
-                        "credits": value["other"]["credits"]
-                    }
-                }
+                self._available = True
+            else:
+                self._available = False
 
-                if(first):
-                    gather_top_credit = [
-                        day["gather"]["credits"]
-                        ]
-                    gather_top_traffic = [
-                        day["gather"]["traffic"]
-                        ]
-                    content_top = [day["content"]["credits"]]
-                    referrals_top = [day["referrals"]["credits"]]
-                    winnings_top = [day["winnings"]["credits"]]
-                    other_top = [day["other"]["credits"]]
-                    first = False
-
-                if(gather_top_credit[0] < day["gather"]["credits"]):
-                    gather_top_credit = [
-                        day["gather"]["credits"]
-                        ]
-                    gather_top_traffic = [
-                        day["gather"]["traffic"]
-                        ]
-
-                if(content_top[0] < day["content"]["credits"]):
-                    content_top = [
-                        day["content"]["credits"],
-                        day["content"]["time"]
-                        ]
-
-                if(referrals_top[0] < day["referrals"]["credits"]):
-                    referrals_top = [day["referrals"]["credits"]]
-
-                if(winnings_top[0] < day["winnings"]["credits"]):
-                    winnings_top = [day["winnings"]["credits"]]
-
-                if(other_top[0] < day["other"]["credits"]):
-                    other_top = [day["other"]["credits"]]
-
-            self._month_stats = {
-                "gather credit": gather_top_credit,
-                "gather traffic": gather_top_traffic,
-                "content": content_top,
-                "referrals": referrals_top,
-                "winnings": winnings_top,
-                "other": other_top
-            }
-            self._state = credits_total
         except:
-            _LOGGER.error("Error while getting month data")
+            self._available = False
+            _LOGGER.exception("Error retrieving stats from HoneyGain.")
 
-class BalanceSensor(SensorEntity):
-    def __init__(self, hg_user):
-        self._state = None
-        self._balance = {}
-        self._hg_user = hg_user
+class HoneyGainScrapperStatsTodaySensor(Entity):
+    """Representation of a HoneyGain sensor."""
 
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+        self.url = url
+        self._hass = hass
+        self._name = "HoneyGain stats today"
+        self._state = ""
+        self._available = True
+        self.attrs: Dict[str, Any] = {}
+    
     @property
-    def name(self):
-        return 'HoneyGain Balance'
-
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self._name
+    
     @property
-    def unique_id(self):
-        return f"honeygain_balance"
-
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return f'{sanitize_text(self._name)}_{self.url}'
+    
     @property
-    def state(self):
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+    
+    @property
+    def state(self) -> Optional[str]:
         return self._state
-
-    @property
-    def extra_state_attributes(self):
-        return self._balance
     
-    def update(self):
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        return self.attrs
+    
+    async def async_update(self):
         try:
-            myData = self._hg_user.balances()
+            page_url = f'{self.url}/{INFOS_STATS_TODAY}'
+            data = await get_data(self._hass, page_url)
 
-            self._balance = {
-                "realtime credits": myData["realtime"]["credits"],
-                "realtime cents": myData["realtime"]["usd_cents"],
-                "payout credits": myData["payout"]["credits"],
-                "payout cents": myData["payout"]["usd_cents"],
-                "min credits": myData["min_payout"]["credits"],
-                "min cents": myData["min_payout"]["usd_cents"],
-            }
-            self._state = myData["payout"]["usd_cents"]
+            if "total" in data:
+                del data["total"]
+            if "winning" in data:
+                del data["winning"]
+            if "referral" in data:
+                del data["referral"]
+            if "other" in data:
+                del data["other"]
+            if "cdn" in data:
+                data["cdn_credits"] = data["cdn"]["credits"]
+                data["cdn_seconds"] = data["cdn"]["seconds"]
+                del data["cdn"]
+            if "gathering" in data:
+                data["gathering_credits"] = data["gathering"]["credits"]
+                del data["gathering"]
+
+            self._state = data["total_credits"]
+            self.attrs = data
+
+            self._available = True
         except:
-            _LOGGER.error("Error while getting user data")
+            self._available = False
+            _LOGGER.exception("Error retrieving today stats from HoneyGain.")
+
+class HoneyGainScrapperStatsTodayJTSensor(Entity):
+    """Representation of a HoneyGain sensor."""
+
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+        self.url = url
+        self._hass = hass
+        self._name = "HoneyGain stats today JT"
+        self._state = ""
+        self._available = True
+        self.attrs: Dict[str, Any] = {}
+    
+    @property
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self._name
+    
+    @property
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return f'{sanitize_text(self._name)}_{self.url}'
+    
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+    
+    @property
+    def state(self) -> Optional[str]:
+        return self._state
+    
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        return self.attrs
+    
+    async def async_update(self):
+        try:
+            page_url = f'{self.url}/{INFOS_STATS_TODAY_JT}'
+            data = await get_data(self._hass, page_url)
+
+            if "total" in data:
+                data["total_credits"] = data["total"]["credits"]
+                del data["total"]
+            if "winning" in data:
+                data["winning_credits"] = data["winning"]["credits"]
+                del data["winning"]
+            if "referral" in data:
+                data["referral_credits"] = data["referral"]["credits"]
+                del data["referral"]
+            if "other" in data:
+                data["other_credits"] = data["other"]["credits"]
+                del data["other"]
+            if "bonus" in data:
+                data["bonus_credits"] = data["bonus"]["credits"]
+                del data["bonus"]
+            if "cdn" in data:
+                data["cdn_credits"] = data["cdn"]["credits"]
+                data["cdn_seconds"] = data["cdn"]["seconds"]
+                del data["cdn"]
+            if "gathering" in data:
+                data["gathering_credits"] = data["gathering"]["credits"]
+                data["gathering_bytes"] = data["gathering"]["bytes"]
+                del data["gathering"]
+            
+
+            self._state = data["total_credits"]
+            self.attrs = data
+
+            self._available = True
+        except:
+            self._available = False
+            _LOGGER.exception("Error retrieving today stats from HoneyGain.")
+
+class HoneyGainScrapperNotificationsSensor(Entity):
+    """Representation of a HoneyGain sensor."""
+
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+        self.url = url
+        self._hass = hass
+        self._name = "HoneyGain notifications"
+        self._state = ""
+        self._available = True
+    
+    @property
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self._name
+    
+    @property
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return f'{sanitize_text(self._name)}_{self.url}'
+    
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+    
+    @property
+    def state(self) -> Optional[str]:
+        return self._state
+    
+    async def async_update(self):
+        try:
+            page_url = f'{self.url}/{INFOS_NOTIFICATIONS}'
+            data = await get_data(self._hass, page_url)
+
+            self._state = len(data)
+
+            self._available = True
+        except:
+            self._available = False
+            _LOGGER.exception("Error retrieving nitifications from HoneyGain.")
+
+class HoneyGainScrapperBalancesSensor(Entity):
+    """Representation of a HoneyGain sensor."""
+
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+        self.url = url
+        self._hass = hass
+        self._name = "HoneyGain balances"
+        self._state = ""
+        self._available = True
+        self.attrs: Dict[str, Any] = {}
+    
+    @property
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self._name
+    
+    @property
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return f'{sanitize_text(self._name)}_{self.url}'
+    
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+    
+    @property
+    def state(self) -> Optional[str]:
+        return self._state
+    
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        return self.attrs
+    
+    async def async_update(self):
+        try:
+            page_url = f'{self.url}/{INFOS_BALANCES}'
+            data = await get_data(self._hass, page_url)
+
+            if "payout" in data:
+                self._state = data["payout"]["credits"]
+            self.attrs = data
+
+            self._available = True
+        except:
+            self._available = False
+            _LOGGER.exception("Error retrieving today stats from HoneyGain.")
+
+
+
 
