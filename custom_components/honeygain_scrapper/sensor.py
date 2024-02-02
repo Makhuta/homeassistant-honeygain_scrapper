@@ -45,9 +45,14 @@ async def get_stats(hass: HomeAssistantType, url: CONF_URL):
     page_url = f'{url}/{INFOS_STATS}'
     data = await get_data(hass, page_url)
     stats = []
+    last_update = ""
+    if "last_updated" in data:
+        last_update = data["last_updated"]
     for key in data:
-        data[key]["date"] = key
-        stats.append(data[key])
+        if type(data[key]) == dict:
+            data[key]["date"] = key
+            data[key]["last_updated"] = last_update
+            stats.append(data[key])
     return stats
 
 
@@ -214,7 +219,7 @@ class HoneyGainScrapperStatsSensor(Entity):
     def __init__(self, hass: HomeAssistantType, url: CONF_URL, id: CONF_ID):
         self.url = url
         self._hass = hass
-        self._name = f'HoneyGain stats past {30 - id}'
+        self._name = f'HoneyGain stats past {"0" if (30 - (id + 1)) < 10 else ""}{30 - (id + 1)}'
         self._id = id
         self._state = ""
         self._available = True
