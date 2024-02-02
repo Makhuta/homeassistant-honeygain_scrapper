@@ -30,6 +30,17 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(minutes=10)
 
+def convert_objects(object: Dict[str, Any]) -> Dict[str, Any]:
+    data = {}
+    for key in object:
+        item = object[key]
+        if type(item) == dict:
+            data[key] = [convert_objects(item)]
+        else:
+            data[key] = item
+
+    return data
+
 def sanitize_text(input_text):
     lowercase_text = str(input_text).lower()
     normalized_text = ''.join(c for c in unicodedata.normalize('NFD', lowercase_text) if unicodedata.category(c) != 'Mn')
@@ -157,7 +168,7 @@ class HoneyGainScrapperMeSensor(Entity):
             data = await get_data(self._hass, page_url)
 
             self._state = data["email"]
-            self.attrs = data
+            self.attrs = convert_objects(data)
 
             self._available = True
         except:
@@ -206,7 +217,7 @@ class HoneyGainScrapperDevicesSensor(Entity):
 
             if "id" in data:
                 self._state = data["id"]
-            self.attrs = data
+            self.attrs = convert_objects(data)
 
             self._available = True
         except:
@@ -255,7 +266,7 @@ class HoneyGainScrapperStatsSensor(Entity):
             if len(data) > self._id:
                 if "date" in data[self._id]:
                     self._state = data[self._id]["date"]
-                self.attrs = data[self._id]
+                self.attrs = convert_objects(data[self._id])
 
                 self._available = True
             else:
@@ -321,7 +332,7 @@ class HoneyGainScrapperStatsTodaySensor(Entity):
                 del data["gathering"]
 
             self._state = data["total_credits"]
-            self.attrs = data
+            self.attrs = convert_objects(data)
 
             self._available = True
         except:
@@ -393,7 +404,7 @@ class HoneyGainScrapperStatsTodayJTSensor(Entity):
             
 
             self._state = data["total_credits"]
-            self.attrs = data
+            self.attrs = convert_objects(data)
 
             self._available = True
         except:
@@ -482,7 +493,8 @@ class HoneyGainScrapperBalancesSensor(Entity):
 
             if "payout" in data:
                 self._state = data["payout"]["credits"]
-            self.attrs = data
+
+            self.attrs = convert_objects(data)
 
             self._available = True
         except:
