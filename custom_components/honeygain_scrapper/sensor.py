@@ -143,6 +143,10 @@ class HoneyGainScrapperMeSensor(Entity):
     def name(self) -> str:
         """Return the name of the entity."""
         return self._name
+
+    @property
+    def icon(self):
+        return "mdi:account"
     
     @property
     def unique_id(self) -> str:
@@ -191,6 +195,10 @@ class HoneyGainScrapperDevicesSensor(Entity):
     def name(self) -> str:
         """Return the name of the entity."""
         return self._name
+
+    @property
+    def icon(self):
+        return "mdi:devices"
     
     @property
     def unique_id(self) -> str:
@@ -231,6 +239,7 @@ class HoneyGainScrapperStatsSensor(Entity):
         self.url = url
         self._hass = hass
         self._name = f'HoneyGain stats past {"0" if (30 - (id + 1)) < 10 else ""}{30 - (id + 1)}'
+        self._unit_of_measurement = "credits"
         self._id = id
         self._state = ""
         self._available = True
@@ -240,6 +249,15 @@ class HoneyGainScrapperStatsSensor(Entity):
     def name(self) -> str:
         """Return the name of the entity."""
         return self._name
+
+    @property
+    def icon(self):
+        return "mdi:history"
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit the value is expressed in."""
+        return self._unit_of_measurement
     
     @property
     def unique_id(self) -> str:
@@ -264,8 +282,10 @@ class HoneyGainScrapperStatsSensor(Entity):
             data = await get_stats(self._hass, self.url)
 
             if len(data) > self._id:
-                if "date" in data[self._id]:
-                    self._state = data[self._id]["date"]
+                if "gathering" in data[self._id] and "credits" in data[self._id]["gathering"]:
+                    self._state = data[self._id]["gathering"]["credits"]
+                else:
+                    self._state = -1
                 self.attrs = convert_objects(data[self._id])
 
                 self._available = True
@@ -283,6 +303,7 @@ class HoneyGainScrapperStatsTodaySensor(Entity):
         self.url = url
         self._hass = hass
         self._name = "HoneyGain stats today"
+        self._unit_of_measurement = "credits"
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
@@ -291,6 +312,15 @@ class HoneyGainScrapperStatsTodaySensor(Entity):
     def name(self) -> str:
         """Return the name of the entity."""
         return self._name
+
+    @property
+    def icon(self):
+        return "mdi:calendar-today"
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit the value is expressed in."""
+        return self._unit_of_measurement
     
     @property
     def unique_id(self) -> str:
@@ -346,6 +376,7 @@ class HoneyGainScrapperStatsTodayJTSensor(Entity):
         self.url = url
         self._hass = hass
         self._name = "HoneyGain stats today JT"
+        self._unit_of_measurement = "credits"
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
@@ -354,6 +385,15 @@ class HoneyGainScrapperStatsTodayJTSensor(Entity):
     def name(self) -> str:
         """Return the name of the entity."""
         return self._name
+
+    @property
+    def icon(self):
+        return "mdi:calendar-today-outline"
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit the value is expressed in."""
+        return self._unit_of_measurement
     
     @property
     def unique_id(self) -> str:
@@ -425,6 +465,10 @@ class HoneyGainScrapperNotificationsSensor(Entity):
     def name(self) -> str:
         """Return the name of the entity."""
         return self._name
+
+    @property
+    def icon(self):
+        return "mdi:message-badge"
     
     @property
     def unique_id(self) -> str:
@@ -459,6 +503,7 @@ class HoneyGainScrapperBalancesSensor(Entity):
         self.url = url
         self._hass = hass
         self._name = "HoneyGain balances"
+        self._unit_of_measurement = "credits"
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
@@ -467,6 +512,15 @@ class HoneyGainScrapperBalancesSensor(Entity):
     def name(self) -> str:
         """Return the name of the entity."""
         return self._name
+
+    @property
+    def icon(self):
+        return "mdi:sack"
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit the value is expressed in."""
+        return self._unit_of_measurement
     
     @property
     def unique_id(self) -> str:
@@ -493,6 +547,8 @@ class HoneyGainScrapperBalancesSensor(Entity):
 
             if "payout" in data:
                 self._state = data["payout"]["credits"]
+            else:
+                self._state = -1
 
             self.attrs = convert_objects(data)
 
