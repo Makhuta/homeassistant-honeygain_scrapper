@@ -17,6 +17,7 @@ from homeassistant.const import CONF_URL, CONF_NAME, CONF_ID
 from requests import get
 
 from .const import (
+    DOMAIN,
     INFOS_ME,
     INFOS_DEVICES,
     INFOS_STATS,
@@ -93,9 +94,8 @@ async def async_setup_entry(
     hass: HomeAssistantType,
     config_entry: ConfigType,
     async_add_entities: Callable,
-    discovery_info: Optional[DiscoveryInfoType] = None,
 ) -> None:
-    config = config_entry.data
+    config = hass.data[DOMAIN][config_entry.entry_id]
     sensors_normal = [
         HoneyGainScrapperMeSensor(hass, config[CONF_URL], config[CONF_NAME]),
         HoneyGainScrapperStatsTodaySensor(hass, config[CONF_URL], config[CONF_NAME]),
@@ -140,6 +140,7 @@ class HoneyGainScrapperMeSensor(Entity):
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
+        self._entity_name = entity_name
     
     @property
     def name(self) -> str:
@@ -163,6 +164,10 @@ class HoneyGainScrapperMeSensor(Entity):
     @property
     def state(self) -> Optional[str]:
         return self._state
+
+    @property
+    def device_info(self):
+        return {"name": f'{self._entity_name} user info', "manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} user info')}}
     
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -192,6 +197,7 @@ class HoneyGainScrapperDevicesSensor(Entity):
         self._available = True
         self._id = id
         self.attrs: Dict[str, Any] = {}
+        self._entity_name = entity_name
     
     @property
     def name(self) -> str:
@@ -215,6 +221,10 @@ class HoneyGainScrapperDevicesSensor(Entity):
     @property
     def state(self) -> Optional[str]:
         return self._state
+
+    @property
+    def device_info(self):
+        return {"name": f'{self._entity_name} devices' ,"manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} devices')}}
     
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -246,6 +256,7 @@ class HoneyGainScrapperStatsSensor(Entity):
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
+        self._entity_name = entity_name
     
     @property
     def name(self) -> str:
@@ -274,6 +285,10 @@ class HoneyGainScrapperStatsSensor(Entity):
     @property
     def state(self) -> Optional[str]:
         return self._state
+
+    @property
+    def device_info(self):
+        return {"name": f'{self._entity_name} month stats' ,"manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} month stats')}}
     
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -309,6 +324,7 @@ class HoneyGainScrapperStatsTodaySensor(Entity):
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
+        self._entity_name = entity_name
     
     @property
     def name(self) -> str:
@@ -337,6 +353,10 @@ class HoneyGainScrapperStatsTodaySensor(Entity):
     @property
     def state(self) -> Optional[str]:
         return self._state
+
+    @property
+    def device_info(self):
+        return {"name": f'{self._entity_name} stats' ,"manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} stats')}}
     
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -382,6 +402,7 @@ class HoneyGainScrapperStatsTodayJTSensor(Entity):
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
+        self._entity_name = entity_name
     
     @property
     def name(self) -> str:
@@ -410,6 +431,10 @@ class HoneyGainScrapperStatsTodayJTSensor(Entity):
     @property
     def state(self) -> Optional[str]:
         return self._state
+
+    @property
+    def device_info(self):
+        return {"name": f'{self._entity_name} stats' ,"manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} stats')}}
     
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -462,6 +487,7 @@ class HoneyGainScrapperNotificationsSensor(Entity):
         self._name = f'{entity_name} notifications'
         self._state = ""
         self._available = True
+        self._entity_name = entity_name
     
     @property
     def name(self) -> str:
@@ -485,6 +511,10 @@ class HoneyGainScrapperNotificationsSensor(Entity):
     @property
     def state(self) -> Optional[str]:
         return self._state
+
+    @property
+    def device_info(self):
+        return {"name": f'{self._entity_name} user info' ,"manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} user info')}}
     
     async def async_update(self):
         try:
@@ -509,6 +539,7 @@ class HoneyGainScrapperBalancesSensor(Entity):
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
+        self._entity_name = entity_name
     
     @property
     def name(self) -> str:
@@ -537,6 +568,10 @@ class HoneyGainScrapperBalancesSensor(Entity):
     @property
     def state(self) -> Optional[str]:
         return self._state
+
+    @property
+    def device_info(self):
+        return {"name": f'{self._entity_name} stats' ,"manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} stats')}}
     
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
