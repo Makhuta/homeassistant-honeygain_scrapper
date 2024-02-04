@@ -89,18 +89,19 @@ def filter_array(id: CONF_ID, arr):
 
     return {}
 
-async def async_setup_platform(
+async def async_setup_entry(
     hass: HomeAssistantType,
-    config: ConfigType,
+    config_entry: ConfigType,
     async_add_entities: Callable,
     discovery_info: Optional[DiscoveryInfoType] = None,
 ) -> None:
+    config = config_entry.data
     sensors_normal = [
-        HoneyGainScrapperMeSensor(hass, config[CONF_URL]),
-        HoneyGainScrapperStatsTodaySensor(hass, config[CONF_URL]),
-        HoneyGainScrapperStatsTodayJTSensor(hass, config[CONF_URL]),
-        HoneyGainScrapperNotificationsSensor(hass, config[CONF_URL]),
-        HoneyGainScrapperBalancesSensor(hass, config[CONF_URL])
+        HoneyGainScrapperMeSensor(hass, config[CONF_URL], config[CONF_NAME]),
+        HoneyGainScrapperStatsTodaySensor(hass, config[CONF_URL], config[CONF_NAME]),
+        HoneyGainScrapperStatsTodayJTSensor(hass, config[CONF_URL], config[CONF_NAME]),
+        HoneyGainScrapperNotificationsSensor(hass, config[CONF_URL], config[CONF_NAME]),
+        HoneyGainScrapperBalancesSensor(hass, config[CONF_URL], config[CONF_NAME])
     ]
 
     try:
@@ -109,7 +110,8 @@ async def async_setup_platform(
                 hass, 
                 config[CONF_URL], 
                 sanitize_text(d["title"] if d["title"] != None else d["model"]), 
-                d["id"]) 
+                d["id"],
+                config[CONF_NAME]) 
                 for d in await get_devices(hass, config[CONF_URL]
             )
         ]
@@ -120,7 +122,7 @@ async def async_setup_platform(
     try:
         stats = await get_stats(hass, config[CONF_URL])
 
-        statsSensors = [HoneyGainScrapperStatsSensor(hass, config[CONF_URL], s) for s in range(len(stats))]
+        statsSensors = [HoneyGainScrapperStatsSensor(hass, config[CONF_URL], s, config[CONF_NAME]) for s in range(len(stats))]
     except:
         _LOGGER.exception("Error retrieving devices from HoneyGain.")
         statsSensors = []
@@ -131,10 +133,10 @@ async def async_setup_platform(
 class HoneyGainScrapperMeSensor(Entity):
     """Representation of a HoneyGain sensor."""
 
-    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
         self.url = url
         self._hass = hass
-        self._name = "HoneyGain Me"
+        self._name = f'{entity_name} Me'
         self._state = ""
         self._available = True
         self.attrs: Dict[str, Any] = {}
@@ -182,10 +184,10 @@ class HoneyGainScrapperMeSensor(Entity):
 class HoneyGainScrapperDevicesSensor(Entity):
     """Representation of a HoneyGain sensor."""
 
-    def __init__(self, hass: HomeAssistantType, url: CONF_URL, name: CONF_NAME, id: CONF_ID):
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, name: CONF_NAME, id: CONF_ID, entity_name: CONF_NAME):
         self.url = url
         self._hass = hass
-        self._name = f'HoneyGain Device {name}'
+        self._name = f'{entity_name} Device {name}'
         self._state = ""
         self._available = True
         self._id = id
@@ -235,10 +237,10 @@ class HoneyGainScrapperDevicesSensor(Entity):
 class HoneyGainScrapperStatsSensor(Entity):
     """Representation of a HoneyGain sensor."""
 
-    def __init__(self, hass: HomeAssistantType, url: CONF_URL, id: CONF_ID):
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, id: CONF_ID, entity_name: CONF_NAME):
         self.url = url
         self._hass = hass
-        self._name = f'HoneyGain stats past {"0" if (30 - (id + 1)) < 10 else ""}{30 - (id + 1)}'
+        self._name = f'{entity_name} stats past {"0" if (30 - (id + 1)) < 10 else ""}{30 - (id + 1)}'
         self._unit_of_measurement = "credits"
         self._id = id
         self._state = ""
@@ -299,10 +301,10 @@ class HoneyGainScrapperStatsSensor(Entity):
 class HoneyGainScrapperStatsTodaySensor(Entity):
     """Representation of a HoneyGain sensor."""
 
-    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
         self.url = url
         self._hass = hass
-        self._name = "HoneyGain stats today"
+        self._name = f'{entity_name} stats today'
         self._unit_of_measurement = "credits"
         self._state = ""
         self._available = True
@@ -372,10 +374,10 @@ class HoneyGainScrapperStatsTodaySensor(Entity):
 class HoneyGainScrapperStatsTodayJTSensor(Entity):
     """Representation of a HoneyGain sensor."""
 
-    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
         self.url = url
         self._hass = hass
-        self._name = "HoneyGain stats today JT"
+        self._name = f'{entity_name} stats today JT'
         self._unit_of_measurement = "credits"
         self._state = ""
         self._available = True
@@ -454,10 +456,10 @@ class HoneyGainScrapperStatsTodayJTSensor(Entity):
 class HoneyGainScrapperNotificationsSensor(Entity):
     """Representation of a HoneyGain sensor."""
 
-    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
         self.url = url
         self._hass = hass
-        self._name = "HoneyGain notifications"
+        self._name = f'{entity_name} notifications'
         self._state = ""
         self._available = True
     
@@ -499,10 +501,10 @@ class HoneyGainScrapperNotificationsSensor(Entity):
 class HoneyGainScrapperBalancesSensor(Entity):
     """Representation of a HoneyGain sensor."""
 
-    def __init__(self, hass: HomeAssistantType, url: CONF_URL):
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
         self.url = url
         self._hass = hass
-        self._name = "HoneyGain balances"
+        self._name = f'{entity_name} balances'
         self._unit_of_measurement = "credits"
         self._state = ""
         self._available = True

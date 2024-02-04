@@ -1,0 +1,15 @@
+{
+    "config": {
+      "step": {
+        "user": {
+          "data": {
+            "name": "Name",
+            "url": "URL"
+          }
+        }
+      },
+      "abort": {
+        "already_configured": "URL is already configured"
+      }
+    }
+  }
