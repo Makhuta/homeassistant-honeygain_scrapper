@@ -178,7 +178,8 @@ class HoneyGainScrapperMeSensor(Entity):
             page_url = f'{self.url}/{INFOS_ME}'
             data = await get_data(self._hass, page_url)
 
-            self._state = data["email"]
+            if "email" in data:
+                self._state = data["email"]
             self.attrs = convert_objects(data)
 
             self._available = True
@@ -383,7 +384,10 @@ class HoneyGainScrapperStatsTodaySensor(Entity):
                 data["gathering_credits"] = data["gathering"]["credits"]
                 del data["gathering"]
 
-            self._state = data["total_credits"]
+            if "total_credits" in data:
+                self._state = data["total_credits"]
+            else:
+                self._state = 0.00
             self.attrs = convert_objects(data)
 
             self._available = True
@@ -469,8 +473,10 @@ class HoneyGainScrapperStatsTodayJTSensor(Entity):
                 data["gathering_bytes"] = data["gathering"]["bytes"]
                 del data["gathering"]
             
-
-            self._state = data["total_credits"]
+            if "total_credits" in data:
+                self._state = data["total_credits"]
+            else:
+                self._state = 0.00
             self.attrs = convert_objects(data)
 
             self._available = True
@@ -585,7 +591,7 @@ class HoneyGainScrapperBalancesSensor(Entity):
             if "payout" in data:
                 self._state = data["payout"]["credits"]
             else:
-                self._state = -1
+                self._state = 0.00
 
             self.attrs = convert_objects(data)
 
