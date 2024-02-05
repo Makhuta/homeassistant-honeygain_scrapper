@@ -2,6 +2,7 @@ DOMAIN = "honeygain_scrapper"
 
 DEFAULT_NAME = "HoneyGain"
 DEFAULT_URL = "http://127.0.0.1:8080"
+HONEYPOT_MIN_BYTES = 15_000_000
 
 # Infos
 INFOS_ME = "infos/me"
