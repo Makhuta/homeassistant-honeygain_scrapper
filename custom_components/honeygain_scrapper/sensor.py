@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, Optional
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 import re
 import unicodedata
 
@@ -10,14 +10,16 @@ from homeassistant.helpers.typing import (
     HomeAssistantType,
 )
 
-from homeassistant.helpers.entity import Entity
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import CONF_URL, CONF_NAME, CONF_ID
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from requests import get
 
 from .const import (
     DOMAIN,
+    HONEYPOT_MIN_BYTES,
     INFOS_ME,
     INFOS_DEVICES,
     INFOS_STATS,
@@ -25,7 +27,8 @@ from .const import (
     INFOS_STATS_TODAY_JT,
     INFOS_NOTIFICATIONS,
     INFOS_PAYOUTS,
-    INFOS_BALANCES
+    INFOS_BALANCES,
+    BUTTON_EVENT
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -101,7 +104,8 @@ async def async_setup_entry(
         HoneyGainScrapperStatsTodaySensor(hass, config[CONF_URL], config[CONF_NAME]),
         HoneyGainScrapperStatsTodayJTSensor(hass, config[CONF_URL], config[CONF_NAME]),
         HoneyGainScrapperNotificationsSensor(hass, config[CONF_URL], config[CONF_NAME]),
-        HoneyGainScrapperBalancesSensor(hass, config[CONF_URL], config[CONF_NAME])
+        HoneyGainScrapperBalancesSensor(hass, config[CONF_URL], config[CONF_NAME]),
+        HoneyGainScrapperHoneyPotSensor(hass, config[CONF_URL], config[CONF_NAME], config_entry.entry_id)
     ]
 
     try:
@@ -130,7 +134,7 @@ async def async_setup_entry(
     sensors = sensors_normal + devices + statsSensors
     async_add_entities(sensors, update_before_add=True)
 
-class HoneyGainScrapperMeSensor(Entity):
+class HoneyGainScrapperMeSensor(SensorEntity):
     """Representation of a HoneyGain sensor."""
 
     def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
@@ -187,7 +191,7 @@ class HoneyGainScrapperMeSensor(Entity):
             self._available = False
             _LOGGER.exception("Error retrieving data from HoneyGain.")
 
-class HoneyGainScrapperDevicesSensor(Entity):
+class HoneyGainScrapperDevicesSensor(SensorEntity):
     """Representation of a HoneyGain sensor."""
 
     def __init__(self, hass: HomeAssistantType, url: CONF_URL, name: CONF_NAME, id: CONF_ID, entity_name: CONF_NAME):
@@ -245,7 +249,7 @@ class HoneyGainScrapperDevicesSensor(Entity):
             self._available = False
             _LOGGER.exception("Error retrieving data from HoneyGain.")
 
-class HoneyGainScrapperStatsSensor(Entity):
+class HoneyGainScrapperStatsSensor(SensorEntity):
     """Representation of a HoneyGain sensor."""
 
     def __init__(self, hass: HomeAssistantType, url: CONF_URL, id: CONF_ID, entity_name: CONF_NAME):
@@ -314,7 +318,7 @@ class HoneyGainScrapperStatsSensor(Entity):
             self._available = False
             _LOGGER.exception("Error retrieving stats from HoneyGain.")
 
-class HoneyGainScrapperStatsTodaySensor(Entity):
+class HoneyGainScrapperStatsTodaySensor(SensorEntity):
     """Representation of a HoneyGain sensor."""
 
     def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
@@ -395,7 +399,7 @@ class HoneyGainScrapperStatsTodaySensor(Entity):
             self._available = False
             _LOGGER.exception("Error retrieving today stats from HoneyGain.")
 
-class HoneyGainScrapperStatsTodayJTSensor(Entity):
+class HoneyGainScrapperStatsTodayJTSensor(SensorEntity):
     """Representation of a HoneyGain sensor."""
 
     def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
@@ -484,7 +488,7 @@ class HoneyGainScrapperStatsTodayJTSensor(Entity):
             self._available = False
             _LOGGER.exception("Error retrieving today stats from HoneyGain.")
 
-class HoneyGainScrapperNotificationsSensor(Entity):
+class HoneyGainScrapperNotificationsSensor(SensorEntity):
     """Representation of a HoneyGain sensor."""
 
     def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
@@ -534,7 +538,7 @@ class HoneyGainScrapperNotificationsSensor(Entity):
             self._available = False
             _LOGGER.exception("Error retrieving nitifications from HoneyGain.")
 
-class HoneyGainScrapperBalancesSensor(Entity):
+class HoneyGainScrapperBalancesSensor(SensorEntity):
     """Representation of a HoneyGain sensor."""
 
     def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME):
@@ -600,6 +604,127 @@ class HoneyGainScrapperBalancesSensor(Entity):
             self._available = False
             _LOGGER.exception("Error retrieving today stats from HoneyGain.")
 
+class HoneyGainScrapperHoneyPotSensor(SensorEntity):
+    """Representation of a HoneyGain sensor."""
 
+    def __init__(self, hass: HomeAssistantType, url: CONF_URL, entity_name: CONF_NAME, entry_id):
+        self.url = url
+        self._hass = hass
+        self._name = f'{entity_name} honeypot'
+        self._unit_of_measurement = "credits"
+        self._state = 0
+        self._available = True
+        self.attrs: Dict[str, Any] = {}
+        self._entity_name = entity_name
 
+        async_dispatcher_connect(hass, BUTTON_EVENT.format(entry_id), self.handle_honeypot_update)
 
+    
+    @property
+    def name(self) -> str:
+        """Return the name of the entity."""
+        return self._name
+
+    @property
+    def icon(self):
+        return "mdi:beehive-outline"
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit the value is expressed in."""
+        return self._unit_of_measurement
+    
+    @property
+    def unique_id(self) -> str:
+        """Return the unique ID of the sensor."""
+        return f'{sanitize_text(self._name)}_{self.url}'
+    
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+    
+    @property
+    def state(self) -> Optional[str]:
+        return self._state
+
+    @property
+    def device_info(self):
+        return {"name": f'{self._entity_name} functions' ,"manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} functions')}}
+    
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        return self.attrs
+    
+    async def async_update(self):
+        try:
+            page_url = f'{self.url}/{INFOS_STATS}'
+            data = await get_data(self._hass, page_url)
+
+            today = date.today()
+            today_string = today.strftime("%Y-%m-%d")
+
+            out = {
+                "success": False,
+                "can_open": False,
+                "credits": 0,
+            }
+
+            if today_string in data:
+                today_data = data[today_string]
+                if "winnings" in today_data:
+                    today_winnings = today_data["winnings"]
+                    if "combined_of" in today_winnings:
+                        today_combined_of = today_winnings["combined_of"]
+                        if today_combined_of is not None and "lucky_pot" in today_combined_of:
+                            today_lucky_pot = today_combined_of["lucky_pot"]
+                            if today_lucky_pot is not None and "credits" in today_lucky_pot:
+                                out = {
+                                    "success": not today_lucky_pot["credits"] == 0,
+                                    "can_open": "gathering" in today_data and "traffic" in today_data["gathering"] and today_data["gathering"]["traffic"] >= HONEYPOT_MIN_BYTES,
+                                    "credits": today_lucky_pot["credits"]
+                                }
+
+            self._state = out["credits"]
+            self.attrs = out
+            self._available = True
+        except:
+            self._available = False
+            _LOGGER.exception("Error retrieving honeypot from HoneyGain.")
+
+    async def handle_honeypot_update(self) -> None:
+        try:
+            page_url = f'{self.url}/{INFOS_STATS}'
+            data = await get_data(self._hass, page_url)
+
+            today = date.today()
+            today_string = today.strftime("%Y-%m-%d")
+
+            out = {
+                "success": False,
+                "can_open": False,
+                "credits": 0,
+            }
+
+            if today_string in data:
+                today_data = data[today_string]
+                if "winnings" in today_data:
+                    today_winnings = today_data["winnings"]
+                    if "combined_of" in today_winnings:
+                        today_combined_of = today_winnings["combined_of"]
+                        if today_combined_of is not None and "lucky_pot" in today_combined_of:
+                            today_lucky_pot = today_combined_of["lucky_pot"]
+                            if today_lucky_pot is not None and "credits" in today_lucky_pot:
+                                out = {
+                                    "success": not today_lucky_pot["credits"] == 0,
+                                    "can_open": "gathering" in today_data and "traffic" in today_data["gathering"] and today_data["gathering"]["traffic"] >= HONEYPOT_MIN_BYTES,
+                                    "credits": today_lucky_pot["credits"]
+                                }
+
+            self._state = out["credits"]
+            self.attrs = out
+            self._available = True
+        except:
+            self._available = False
+            _LOGGER.exception("Error retrieving honeypot from HoneyGain.")
+        self.async_write_ha_state()
