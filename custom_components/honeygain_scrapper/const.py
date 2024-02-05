@@ -15,3 +15,4 @@ INFOS_BALANCES = "infos/balances"
 
 # Functions
 FUNCTIONS_OPEN_HONEYPOT = "functions/open_honeypot"
+BUTTON_EVENT = "open_honeypot_pressed"
