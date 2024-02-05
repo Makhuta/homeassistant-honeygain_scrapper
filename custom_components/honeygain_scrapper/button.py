@@ -63,12 +63,7 @@ class HoneyGainScrapperOpenHoneyPot(ButtonEntity):
         self.url = url
         self._hass = hass
         self._name = "HoneyGain open honeypot"
-        self._available = True
         self._entity_name = entity_name
-        self.attrs = {
-                "success": False,
-                "credits": 0,
-            }
 
     @property
     def name(self) -> str:
@@ -87,56 +82,11 @@ class HoneyGainScrapperOpenHoneyPot(ButtonEntity):
     @property
     def device_info(self):
         return {"name": f'{self._entity_name} functions' ,"manufacturer": "HoneyGain", "model": "Scrapper", "identifiers": {(DOMAIN, f'{self.url}{self._entity_name} functions')}}
-    
-    @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
-        return self.attrs
 
     async def async_press(self) -> None:
         """Press the button."""
         try:
-            data = await get_data(self._hass, f'{self.url}/{FUNCTIONS_OPEN_HONEYPOT}')
-            self.attrs = data
-            async_dispatcher_send(self._hass, BUTTON_EVENT, data)
+            await get_data(self._hass, f'{self.url}/{FUNCTIONS_OPEN_HONEYPOT}')
+            async_dispatcher_send(self._hass, BUTTON_EVENT)
         except:
             _LOGGER.exception("Error pressing Honeypot button on HoneyGain.")
-
-    async def async_update(self):
-        try:
-            page_url = f'{self.url}/{INFOS_STATS}'
-            data = await get_data(self._hass, page_url)
-            today = date.today()
-            today_string = today.strftime("%Y-%m-%d")
-
-            out = {
-                "success": False,
-                "credits": 0,
-            }
-
-            if today_string in data:
-                today_data = data[today_string]
-                if "winnings" in today_data:
-                    today_winnings = today_data["winnings"]
-                    if "combined_of" in today_winnings:
-                        today_combined_of = today_winnings["combined_of"]
-                        if today_combined_of is not None and "lucky_pot" in today_combined_of:
-                            today_lucky_pot = today_combined_of["lucky_pot"]
-                            if today_lucky_pot is not None and "credits" in today_lucky_pot:
-                                out = {
-                                    "success": True,
-                                    "credits": today_lucky_pot["credits"]
-                                }
-
-            self.attrs = out
-        except:
-            _LOGGER.exception("Error retrieving data from HoneyGain.")
-
-"""
-    async def async_reset_attributes(self) -> None:
-        #Reset attrs.
-        try:
-            data = await get_data(self._hass, f'{self.url}/{FUNCTIONS_OPEN_HONEYPOT}')
-            self.attrs = data
-        except:
-            _LOGGER.exception("Error reseting Honeypot button attributes on HoneyGain.")
-"""
