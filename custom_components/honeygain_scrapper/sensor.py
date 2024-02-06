@@ -672,6 +672,7 @@ class HoneyGainScrapperHoneyPotSensor(SensorEntity):
 
             if today_string in data:
                 today_data = data[today_string]
+                out["can_open"] = "gathering" in today_data and "traffic" in today_data["gathering"] and today_data["gathering"]["traffic"] >= HONEYPOT_MIN_BYTES
                 if "winnings" in today_data:
                     today_winnings = today_data["winnings"]
                     if "combined_of" in today_winnings:
@@ -679,11 +680,8 @@ class HoneyGainScrapperHoneyPotSensor(SensorEntity):
                         if today_combined_of is not None and "lucky_pot" in today_combined_of:
                             today_lucky_pot = today_combined_of["lucky_pot"]
                             if today_lucky_pot is not None and "credits" in today_lucky_pot:
-                                out = {
-                                    "success": not today_lucky_pot["credits"] == 0,
-                                    "can_open": "gathering" in today_data and "traffic" in today_data["gathering"] and today_data["gathering"]["traffic"] >= HONEYPOT_MIN_BYTES,
-                                    "credits": today_lucky_pot["credits"]
-                                }
+                                out["success"] = not today_lucky_pot["credits"] == 0
+                                out["credits"] = today_lucky_pot["credits"]
 
             self._state = out["credits"]
             self.attrs = out
@@ -708,6 +706,7 @@ class HoneyGainScrapperHoneyPotSensor(SensorEntity):
 
             if today_string in data:
                 today_data = data[today_string]
+                out["can_open"] = "gathering" in today_data and "traffic" in today_data["gathering"] and today_data["gathering"]["traffic"] >= HONEYPOT_MIN_BYTES
                 if "winnings" in today_data:
                     today_winnings = today_data["winnings"]
                     if "combined_of" in today_winnings:
@@ -715,11 +714,8 @@ class HoneyGainScrapperHoneyPotSensor(SensorEntity):
                         if today_combined_of is not None and "lucky_pot" in today_combined_of:
                             today_lucky_pot = today_combined_of["lucky_pot"]
                             if today_lucky_pot is not None and "credits" in today_lucky_pot:
-                                out = {
-                                    "success": not today_lucky_pot["credits"] == 0,
-                                    "can_open": "gathering" in today_data and "traffic" in today_data["gathering"] and today_data["gathering"]["traffic"] >= HONEYPOT_MIN_BYTES,
-                                    "credits": today_lucky_pot["credits"]
-                                }
+                                out["success"] = not today_lucky_pot["credits"] == 0
+                                out["credits"] = today_lucky_pot["credits"]
 
             self._state = out["credits"]
             self.attrs = out
