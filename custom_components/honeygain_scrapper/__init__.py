@@ -2,6 +2,7 @@ import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers import config_validation as cv
 
 
 from homeassistant.const import (
@@ -16,11 +17,7 @@ PLATFORMS = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
-
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the HoneyGain Scrapper component."""
-    # @TODO: Add setup code.
-    return True
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
