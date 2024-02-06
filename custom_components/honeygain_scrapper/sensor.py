@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, Optional
 import logging
-from datetime import date, timedelta
+from datetime import timedelta, datetime
 import re
 import unicodedata
 
@@ -661,7 +661,7 @@ class HoneyGainScrapperHoneyPotSensor(SensorEntity):
             page_url = f'{self.url}/{INFOS_STATS}'
             data = await get_data(self._hass, page_url)
 
-            today = date.today()
+            today = datetime.utcnow()
             today_string = today.strftime("%Y-%m-%d")
 
             out = {
@@ -697,7 +697,7 @@ class HoneyGainScrapperHoneyPotSensor(SensorEntity):
             page_url = f'{self.url}/{INFOS_STATS}'
             data = await get_data(self._hass, page_url)
 
-            today = date.today()
+            today = datetime.utcnow()
             today_string = today.strftime("%Y-%m-%d")
 
             out = {
