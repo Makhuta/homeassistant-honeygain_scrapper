@@ -4,12 +4,16 @@
         "user": {
           "data": {
             "name": "Name",
-            "url": "URL"
+            "username": "Username",
+            "password": "Password"
           }
         }
       },
+      "error": {
+        "failed_to_login": "Failed to Log-in"
+      },
       "abort": {
-        "already_configured": "URL is already configured"
+        "already_configured": "User is already configured"
       }
     }
   }

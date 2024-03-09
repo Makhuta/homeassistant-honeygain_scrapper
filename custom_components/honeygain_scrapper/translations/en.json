@@ -1,15 +1,20 @@
 {
-    "config": {
-      "step": {
-        "user": {
-          "data": {
-            "name": "Name",
-            "url": "URL"
-          }
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "name": "Name",
+          "username": "Username",
+          "password": "Password"
         }
-      },
-      "abort": {
-        "already_configured": "URL is already configured"
       }
+    },
+    "error": {
+      "failed_to_login": "Failed to Log-in"
+    },
+    "abort": {
+      "already_configured": "User is already configured",
+      "failed_to_login": "Failed to Log-in"
     }
   }
+}

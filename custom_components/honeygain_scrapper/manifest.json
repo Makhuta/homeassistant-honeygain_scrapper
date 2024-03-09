@@ -9,6 +9,6 @@
 	"documentation": "https://github.com/Makhuta/homeassistant-honeygain_scrapper",
 	"iot_class": "local_polling",
 	"issue_tracker": "https://github.com/Makhuta/homeassistant-honeygain_scrapper/issues",
-	"requirements": [],
-	"version": "0.3.7"
+	"requirements": ["pyHoneyGain==0.3.5"],
+	"version": "1.0.0"
 }
