@@ -129,7 +129,7 @@ class HG_Api:
     def openHoneyPot(self, honeyPot_info: Dict[str, Any]) -> Dict[str, Any]:
         opened = False
         if "progress_bytes" in honeyPot_info and "max_bytes" in honeyPot_info and "winning_credits" in honeyPot_info:
-            if int(honeyPot_info["progress_bytes"]) == int(honeyPot_info["max_bytes"]) and honeyPot_info["winning_credits"]:
+            if int(honeyPot_info["progress_bytes"]) == int(honeyPot_info["max_bytes"]) and honeyPot_info["winning_credits"] is None:
                 try:
                     reward = self.user.open_honeypot()
                 except NotLoggedInError:

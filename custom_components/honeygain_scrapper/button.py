@@ -30,7 +30,7 @@ class HoneyGainScrapperOpenHoneyPot(ButtonEntity):
     def __init__(self, coordinator: HoneyGainScrapperDataCoordinator, config_entry: ConfigType) -> None:
         """Initialize a open_honeypot button entity."""
         self._coordinator = coordinator
-        self._name = f'{config_entry.data[CONF_NAME]} honeypot'
+        self._name = f'{config_entry.data[CONF_NAME]} open honeypot'
         self._entity_name = config_entry.data[CONF_NAME]
         self._username = config_entry.data[CONF_USERNAME]
 
@@ -55,5 +55,5 @@ class HoneyGainScrapperOpenHoneyPot(ButtonEntity):
     async def async_press(self) -> None:
         """Press the button."""
         if "honeypot" in self._coordinator.data:
-            if self._coordinator.hass.async_add_executor_job(self._coordinator.client.openHoneyPot, self._coordinator.data["honeypot"]):
+            if await self._coordinator.hass.async_add_executor_job(self._coordinator.client.openHoneyPot, self._coordinator.data["honeypot"]):
                 async_dispatcher_send(self._coordinator.hass, BUTTON_EVENT)
