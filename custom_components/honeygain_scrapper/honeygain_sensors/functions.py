@@ -57,7 +57,7 @@ class HoneyGainScrapperHoneyPotSensor(CoordinatorEntity[HoneyGainScrapperDataCoo
     def state(self) -> Optional[str]:
         if "honeypot" in self._coordinator.data:
             if "winning_credits" in self._coordinator.data["honeypot"]:
-                return float(self._coordinator.data["honeypot"]["winning_credits"])
+                return float(self._coordinator.data["honeypot"]["winning_credits"] if self._coordinator.data["honeypot"]["winning_credits"] is not None else 0)
         return 0.0
 
     @property
@@ -71,7 +71,7 @@ class HoneyGainScrapperHoneyPotSensor(CoordinatorEntity[HoneyGainScrapperDataCoo
                 return {
                     "success": self._coordinator.data["honeypot"]["winning_credits"] is not None,
                     "can_open": int(self._coordinator.data["honeypot"]["progress_bytes"]) == int(self._coordinator.data["honeypot"]["max_bytes"]),
-                    "credits": float(self._coordinator.data["honeypot"]["winning_credits"])
+                    "credits": float(self._coordinator.data["honeypot"]["winning_credits"] if self._coordinator.data["honeypot"]["winning_credits"] is not None else 0)
                 }
         return {
             "success": False,
