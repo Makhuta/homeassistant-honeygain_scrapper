@@ -15,14 +15,18 @@ def setup_client(hass: HomeAssistantType, username: CONF_USERNAME, password: CON
 
     return client
 
-def convert_objects(object: Dict[str, Any]) -> Dict[str, Any]:
-    data = {}
-    for key in object:
-        item = object[key]
-        if type(item) == dict:
-            data[key] = [convert_objects(item)]
-        else:
-            data[key] = item
+def convert_objects(data) -> Dict[str, Any]:
+    if type(data) == dict:
+        obj = {}
+        for (keyOuter, valueOuter) in data.items():
+            converted = convert_objects(valueOuter)
+            if type(converted) == dict:
+                for (keyInner, valueInner) in converted.items():
+                    obj[f'{keyOuter}_{keyInner}'] = valueInner
+            else:
+                obj[keyOuter] = converted
+        return obj
+        
     return data
 
 def sanitize_text(input_text):
