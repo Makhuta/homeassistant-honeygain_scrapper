@@ -10,5 +10,5 @@
 	"iot_class": "cloud_polling",
 	"issue_tracker": "https://github.com/Makhuta/homeassistant-honeygain_scrapper/issues",
 	"requirements": ["pyHoneyGain==0.3.5"],
-	"version": "1.0.2"
+	"version": "1.0.5"
 }
