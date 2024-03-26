@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, Optional
 
 from ..const import DOMAIN
 from ..coordinator import HoneyGainScrapperDataCoordinator
-from ..helpers import sanitize_text, convert_objects
+from ..helpers import sanitize_text, convert_objects, containsAllSubstr, sumAll
 from .sensorClass import HoneyGainScrapperSensor
 
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -22,6 +22,13 @@ class HoneyGainScrapperStatsSensor(HoneyGainScrapperSensor):
         self._id = id
         self._icon = "mdi:history"
         self._info_identifier = "month stats"
+        self._categories = [
+                    "gathering",
+                    "content_delivery",
+                    "referrals",
+                    "winnings",
+                    "other"
+                ]
 
     @property
     def unit_of_measurement(self):
@@ -33,16 +40,14 @@ class HoneyGainScrapperStatsSensor(HoneyGainScrapperSensor):
         """Return True if entity is available."""
         if "stats" in self._coordinator.data:
             if self._id < len(self._coordinator.data["stats"]):
-                if "gathering" in self._coordinator.data["stats"][self._id] and "credits" in self._coordinator.data["stats"][self._id]["gathering"]:
-                    return True
+                return containsAllSubstr(self._categories, self._coordinator.data["stats"][self._id], "credits")
         return False
     
     @property
     def state(self) -> Optional[str]:
         if "stats" in self._coordinator.data:
             if self._id < len(self._coordinator.data["stats"]):
-                if "gathering" in self._coordinator.data["stats"][self._id] and "credits" in self._coordinator.data["stats"][self._id]["gathering"]:
-                    return self._coordinator.data["stats"][self._id]["gathering"]["credits"]
+                return sumAll(self._categories, self._coordinator.data["stats"][self._id])
         return 0.0
 
     @property
@@ -71,7 +76,7 @@ class HoneyGainScrapperStatsTodaySensor(HoneyGainScrapperSensor):
     def available(self) -> bool:
         """Return True if entity is available."""
         if "stats_today" in self._coordinator.data:
-            if "gathering_credits" in self._coordinator.data["stats_today"]:
+            if "total_credits" in self._coordinator.data["stats_today"]:
                 return True
         return False
     
@@ -79,8 +84,8 @@ class HoneyGainScrapperStatsTodaySensor(HoneyGainScrapperSensor):
     def state(self) -> Optional[str]:
         """Return the value of the sensor."""
         if "stats_today" in self._coordinator.data:
-            if "gathering_credits" in self._coordinator.data["stats_today"]:
-                return self._coordinator.data["stats_today"]["gathering_credits"]
+            if "total_credits" in self._coordinator.data["stats_today"]:
+                return self._coordinator.data["stats_today"]["total_credits"]
         return 0.0
 
     @property
@@ -108,15 +113,15 @@ class HoneyGainScrapperStatsTodayJTSensor(HoneyGainScrapperSensor):
     def available(self) -> bool:
         """Return True if entity is available."""
         if "stats_today_jt" in self._coordinator.data:
-            if "gathering_credits" in self._coordinator.data["stats_today_jt"]:
+            if "total_credits" in self._coordinator.data["stats_today_jt"]:
                 return True
         return False
     
     @property
     def state(self) -> Optional[str]:
         if "stats_today_jt" in self._coordinator.data:
-            if "gathering_credits" in self._coordinator.data["stats_today_jt"]:
-                return self._coordinator.data["stats_today_jt"]["gathering_credits"]
+            if "total_credits" in self._coordinator.data["stats_today_jt"]:
+                return self._coordinator.data["stats_today_jt"]["total_credits"]
         return 0.0
 
     @property

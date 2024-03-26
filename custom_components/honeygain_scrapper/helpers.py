@@ -35,3 +35,20 @@ def sanitize_text(input_text):
     sanitized_text = re.sub(r'[^a-zA-Z0-9_]', '_', normalized_text)
 
     return sanitized_text
+
+def containsAll(_items: list, _object: Dict[str, Any]) -> bool:
+    return all(list(map(lambda x: x in _object, _items)))
+
+def containsAllSubstr(_items: list, _object: Dict[str, Any], _substr: str) -> bool:
+    return containsAll(_items, _object) and all(list(map(lambda x: _substr in _object[x], _items)))
+
+def sumAll(_items: list, _object: Dict[str, Any]) -> float:
+    if not containsAllSubstr(_items, _object, "credits"):
+        return 0.0
+    return _sum(list(map(lambda x: _object[x]["credits"] if "credits" in _object[x] else 0.0, _items)))
+
+def _sum(_items: list) -> float:
+    out = 0.0
+    for i in _items:
+        out += i
+    return out
