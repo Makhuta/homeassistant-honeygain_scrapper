@@ -1,5 +1,5 @@
 import sys
-from pyHoneygain import HoneyGain, NotLoggedInError
+from .pyHoneygain import HoneyGain, NotLoggedInError
 from datetime import datetime
 import time
 from typing import Dict, Any
@@ -75,9 +75,6 @@ def load_honeypot(status):
             "credits": 0.0
         }
 
-
-        #if int(status["progress_bytes"]) == int(status["max_bytes"] and status["max_bytes"]):
-
     return {
         "success": False,
         "can_open": False,
@@ -102,7 +99,7 @@ class HG_Api:
         data = {}
         functions = {
             "me": self.user.me,
-            "devices": self.user.devices,
+            "devices": lambda: (device_parser(self)),
             "stats": lambda: (stats_parser(self.user.stats())),
             "stats_today": lambda: (statsToday_parser(self.user.stats_today())),
             "stats_today_jt": lambda: (statsTodayJT_parser(self.user.stats_today_jt())),
@@ -144,6 +141,17 @@ class HG_Api:
                     opened = True
         
         return opened
+
+import logging
+_LOGGER = logging.getLogger(__name__)
+
+def device_parser(api: HG_Api):
+    v1_data = api.user.devices("/v1")
+    v2_data = api.user.devices("/v2")
+    v2_ids = [v2_device["id"] for v2_device in v2_data if "id" in v2_device]
+    output = [device for device in v1_data if "id" in device and device["id"] not in v2_ids] + v2_data
+
+    return output
 
 class FailedToLogin(Exception):
     "Raised when the HoneyGain user fail to Log-in"

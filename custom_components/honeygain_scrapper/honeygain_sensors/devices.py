@@ -32,9 +32,10 @@ class HoneyGainScrapperDevicesSensor(HoneyGainScrapperSensor):
     def state(self) -> Optional[str]:
         if "devices" in self._coordinator.data:
             if self._id < len(self._coordinator.data["devices"]):
-                if "id" in self._coordinator.data["devices"][self._id]:
-                    return self._coordinator.data["devices"][self._id]["id"]
-        return "Unknown"
+                if "status" in self._coordinator.data["devices"][self._id]:
+                    if self._coordinator.data["devices"][self._id]["status"] == 'active':
+                        return True
+        return False
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
